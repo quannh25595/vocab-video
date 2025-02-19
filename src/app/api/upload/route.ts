@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join, extname } from "path";
+import { v2 as cloudinary } from "cloudinary";
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,23 +21,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const extension = extname(file.name); // Get extension from original file
-    const filenameWithExt = `${filename}${extension}`;
-
+    // Convert File to Buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Ensure the directory exists
-    const resourcePath = join(process.cwd(), "public/resources");
-    await mkdir(resourcePath, { recursive: true });
+    // Upload to Cloudinary
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "auto",
+          public_id: filename,
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
 
-    // Save the file with extension
-    const filePath = join(resourcePath, filenameWithExt);
-    await writeFile(filePath, buffer);
+      // Write buffer to stream
+      const bufferStream = require("stream").Readable.from(buffer);
+      bufferStream.pipe(uploadStream);
+    });
+
+    const result = (await uploadPromise) as any;
 
     return NextResponse.json({
       success: true,
-      path: `/resources/${filenameWithExt}`,
+      path: result.secure_url,
     });
   } catch (error) {
     console.error("Upload error:", error);
