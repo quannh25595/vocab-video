@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
 
 // Configure Cloudinary
 cloudinary.config({
@@ -39,11 +40,11 @@ export async function POST(request: NextRequest) {
       );
 
       // Write buffer to stream
-      const bufferStream = require("stream").Readable.from(buffer);
+      const bufferStream = Readable.from(buffer);
       bufferStream.pipe(uploadStream);
     });
 
-    const result = (await uploadPromise) as any;
+    const result = (await uploadPromise) as { secure_url: string };
 
     return NextResponse.json({
       success: true,
